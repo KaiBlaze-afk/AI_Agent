@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aria — Venice Agent Workspace</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --bg-canvas: #09090b;
+    --bg-drawer: #111114;
+    --bg-card: #16161a;
+    --bg-dock: rgba(22, 22, 26, 0.90);
+    --border-subtle: #27272a;
+    --border-focus: #3f3f46;
+    --text-main: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --text-dim: #71717a;
+    --accent: #e11d48;
+    --accent-soft: rgba(225, 29, 72, 0.14);
+    --accent-border: rgba(225, 29, 72, 0.45);
+    --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg-canvas);
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* COLLAPSIBLE LEFT DRAWER */
+  .drawer {
+    width: 300px;
+    background: var(--bg-drawer);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: margin-left 0.22s ease;
+    z-index: 30;
+  }
+  .drawer.collapsed { margin-left: -300px; }
+  .drawer-header {
+    height: 54px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand-group { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; letter-spacing: 0.3px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .drawer-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-subtle);
+    background: #0c0c0f;
+  }
+  .drawer-tab {
+    flex: 1;
+    text-align: center;
+    padding: 9px 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .drawer-tab.active { color: var(--text-main); border-bottom-color: var(--accent); }
+  .drawer-pane { flex: 1; overflow-y: auto; padding: 12px; display: none; }
+  .drawer-pane.active { display: block; }
+  .new-chat-btn {
+    width: 100%;
+    padding: 9px 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-weight: 600;
+    font-size: 12.5px;
+    cursor: pointer;
+    margin-bottom: 12px;
+  }
+  .new-chat-btn:hover { opacity: 0.92; }
+  .session-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 12.5px;
+    margin-bottom: 3px;
+  }
+  .session-item:hover, .session-item.active { background: var(--bg-card); color: var(--text-main); }
+  .session-del { opacity: 0; font-size: 10px; color: var(--text-dim); padding: 2px 5px; }
+  .session-item:hover .session-del { opacity: 1; }
+  .session-del:hover { color: var(--accent); }
+  .field-block { margin-bottom: 14px; }
+  .field-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+  .field-input {
+    width: 100%;
+    background: var(--bg-canvas);
+    color: var(--text-main);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 7px 9px;
+    font-size: 11.5px;
+    font-family: var(--font-mono);
+    outline: none;
+  }
+  .field-input:focus { border-color: var(--accent); }
+  input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+
+  /* MAIN STAGE */
+  .stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    height: 100vh;
+    position: relative;
+  }
+  .topbar {
+    height: 54px;
+    flex-shrink: 0;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-subtle);
+    background: rgba(9, 9, 11, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+  .icon-btn {
+    background: var(--bg-card);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+  .icon-btn:hover { color: var(--text-main); border-color: var(--border-focus); }
+  .model-pill {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .telemetry-stats {
+    display: flex;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+
+  /* SCROLLABLE CHAT VIEWPORT */
+  .chat-viewport {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 28px 16px 190px;
+  }
+  .chat-column { max-width: 780px; margin: 0 auto; }
+  .hero-empty { text-align: center; margin-top: 8vh; }
+  .hero-title { font-size: 24px; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.3px; }
+  .hero-sub { color: var(--text-muted); font-size: 13.5px; max-width: 480px; margin: 0 auto 24px; line-height: 1.5; }
+  .starter-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 620px; margin: 0 auto; }
+  .starter-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .starter-card:hover { border-color: var(--accent-border); }
+  .starter-card-title { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; color: var(--text-main); }
+  .starter-card-desc { font-size: 11.5px; color: var(--text-dim); }
+  .turn-block { margin-bottom: 26px; line-height: 1.65; }
+  .user-bubble {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    padding: 11px 16px;
+    border-radius: 12px;
+    max-width: 82%;
+    margin-left: auto;
+    white-space: pre-wrap;
+    color: var(--text-main);
+  }
+  .assistant-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .assistant-name { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--accent); }
+
+  /* THINKING TOGGLE BUTTON & BOX */
+  .think-toggle-btn {
+    background: var(--bg-card);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+  }
+  .think-toggle-btn:hover { border-color: var(--accent-border); color: var(--text-main); }
+  .think-toggle-btn.streaming {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .think-box {
+    display: none;
+    background: #0c0c10;
+    border-left: 2px solid var(--accent);
+    border-top: 1px solid var(--border-subtle);
+    border-right: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+    max-height: 240px;
+    overflow-y: auto;
+    line-height: 1.5;
+  }
+  .think-box.open { display: block; }
+
+  /* TELEMETRY & STEP PILLS */
+  .pill-drawer {
+    border: 1px solid var(--border-subtle);
+    background: #0d0d10;
+    border-radius: 7px;
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .pill-header {
+    padding: 5px 11px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-card);
+    user-select: none;
+  }
+  .pill-header:hover { color: var(--text-main); }
+  .pill-body {
+    display: none;
+    padding: 8px 11px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    max-height: 170px;
+    overflow-y: auto;
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    white-space: pre-wrap;
+  }
+  .pill-drawer.open .pill-body { display: block; }
+  .log-line { padding: 1.5px 0; border-bottom: 1px solid rgba(39,39,42,0.4); }
+  .log-ts { color: var(--text-dim); margin-right: 6px; }
+  .log-tag { color: var(--accent); font-weight: 600; margin-right: 6px; }
+
+  /* IMAGE GALLERY GRID */
+  .image-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 10px;
+    margin: 10px 0 14px;
+  }
+  .img-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 9px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.15s, transform 0.12s;
+  }
+  .img-card:hover { border-color: var(--accent-border); transform: translateY(-2px); }
+  .img-card img {
+    width: 100%;
+    height: 175px;
+    object-fit: cover;
+    display: block;
+    background: #050507;
+    cursor: pointer;
+  }
+  .img-caption {
+    padding: 6px 9px;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* FLOATING COMMAND DOCK */
+  .dock-wrapper {
+    position: absolute;
+    bottom: 18px;
+    left: 0;
+    right: 0;
+    padding: 0 16px;
+    pointer-events: none;
+    z-index: 20;
+  }
+  .dock-box {
+    max-width: 780px;
+    margin: 0 auto;
+    background: var(--bg-dock);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-focus);
+    border-radius: 14px;
+    padding: 10px 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+    pointer-events: auto;
+    position: relative;
+  }
+  .dock-box:focus-within { border-color: var(--accent-border); }
+  .dock-textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    resize: none;
+    outline: none;
+    max-height: 150px;
+    line-height: 1.45;
+    padding: 2px 4px 8px;
+  }
+  .dock-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 6px;
+    border-top: 1px solid rgba(39, 39, 42, 0.7);
+  }
+  .dock-pills { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chip-toggle {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--bg-canvas);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    cursor: pointer;
+    user-select: none;
+  }
+  .chip-toggle.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent-border);
+    font-weight: 600;
+  }
+  .tools-popover {
+    display: none;
+    position: absolute;
+    bottom: 108%;
+    left: 12px;
+    background: var(--bg-drawer);
+    border: 1px solid var(--border-focus);
+    border-radius: 10px;
+    padding: 12px;
+    width: 290px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+  }
+  .tools-popover.open { display: block; }
+  .popover-title { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+  .tool-check-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); padding: 4px 0; cursor: pointer; }
+  .tool-check-row input { accent-color: var(--accent); }
+  .send-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 6px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .stop-btn { background: rgba(248, 81, 73, 0.16); color: #f85149; border: 1px solid #f85149; border-radius: 8px; padding: 6px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .markdown-body pre { background: #050507; padding: 12px; border-radius: 7px; border: 1px solid var(--border-subtle); overflow-x: auto; margin: 10px 0; }
+  .markdown-body code { font-family: var(--font-mono); font-size: 12.5px; }
+  .markdown-body p { margin-bottom: 9px; }
+</style>
+</head>
+<body>
+  <aside class="drawer" id="leftDrawer">
+    <div class="drawer-header">
+      <div class="brand-group">
+        <span class="status-dot"></span>
+        <span>ARIA // VENICE</span>
+      </div>
+      <button class="icon-btn" onclick="toggleDrawer()">Hide</button>
+    </div>
+    <div class="drawer-tabs">
+      <div class="drawer-tab active" id="tabBtnSessions" onclick="switchDrawerTab('sessions')">Sessions</div>
+      <div class="drawer-tab" id="tabBtnConfig" onclick="switchDrawerTab('config')">Persona & Limits</div>
+    </div>
+    <div class="drawer-pane active" id="paneSessions">
+      <button class="new-chat-btn" onclick="createNewSession()">+ New Agent Thread</button>
+      <div id="sessionList"></div>
+    </div>
+    <div class="drawer-pane" id="paneConfig">
+      <div class="field-block">
+        <div class="field-label"><span>Aria Persona</span></div>
+        <textarea id="personaInput" class="field-input" rows="4" style="font-family:var(--font-sans); resize:vertical"></textarea>
+      </div>
+      <div class="field-block">
+        <div class="field-label"><span>Action Token Limit</span><span id="actVal">1536</span></div>
+        <input type="range" id="actSlider" min="256" max="8192" step="256" value="1536" oninput="actVal.innerText=this.value">
+      </div>
+      <div class="field-block">
+        <div class="field-label"><span>Final Response Token Limit</span><span id="finVal">4096</span></div>
+        <input type="range" id="finSlider" min="512" max="8192" step="512" value="4096" oninput="finVal.innerText=this.value">
+      </div>
+      <div class="field-block">
+        <div class="field-label"><span>Max Autonomous Steps</span><span id="stepsVal">8</span></div>
+        <input type="range" id="stepsSlider" min="1" max="15" step="1" value="8" oninput="stepsVal.innerText=this.value">
+      </div>
+      <div class="field-block">
+        <div class="field-label"><span>Max Output Chars</span><span id="obsVal">4000</span></div>
+        <input type="range" id="obsSlider" min="1000" max="10000" step="500" value="4000" oninput="obsVal.innerText=this.value">
+      </div>
+      <div class="field-block">
+        <div class="field-label"><span>Temperature</span><span id="tempVal">0.7</span></div>
+        <input type="range" id="tempSlider" min="0.1" max="1.4" step="0.05" value="0.7" oninput="tempVal.innerText=this.value">
+      </div>
+      <div class="field-block">
+        <div class="field-label"><span>Model Path</span></div>
+        <input type="text" id="modelPathInput" class="field-input" />
+      </div>
+      <div class="field-block">
+        <div class="field-label"><span>Working Directory</span></div>
+        <input type="text" id="cwdInput" class="field-input" />
+      </div>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="icon-btn" onclick="toggleDrawer()">Menu</button>
+        <span class="model-pill">Qwen 3.5 9B • MLX 4-Bit Uncensored</span>
+      </div>
+      <div class="telemetry-stats">
+        <span id="tpsIndicator">0.0 tok/s</span>
+        <span id="memIndicator">RAM: -- MB</span>
+      </div>
+    </header>
+
+    <div class="chat-viewport" id="chatViewport">
+      <div class="chat-column" id="chatColumn"></div>
+    </div>
+
+    <div class="dock-wrapper">
+      <div class="dock-box">
+        <div class="tools-popover" id="toolsPopover">
+          <div class="popover-title">Attached Agent Tools</div>
+          <div id="toolsList"></div>
+        </div>
+        <textarea id="promptInput" class="dock-textarea" rows="2" placeholder="Ask Aria to search & save files to Workspace, show images, or download videos..." onkeydown="handleKey(event)"></textarea>
+        <div class="dock-toolbar">
+          <div class="dock-pills">
+            <span class="chip-toggle active" id="thinkingChip" onclick="toggleThinkingMode()">Thinking: ON</span>
+            <span class="chip-toggle active" id="toolsChip" onclick="toggleToolsPopover()">Tools (7 Active)</span>
+          </div>
+          <div>
+            <button class="send-btn" id="sendBtn" onclick="sendPrompt()">Run</button>
+            <button class="stop-btn" id="stopBtn" style="display:none" onclick="stopGeneration()">Stop</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+<script>
+let currentSessionId = null;
+let abortController = null;
+let thinkingEnabled = true;
+let userScrolledUp = false;
+
+const viewport = document.getElementById('chatViewport');
+
+// Detect when user scrolls up manually so we NEVER hijack their scroll wheel during generation
+viewport.addEventListener('scroll', () => {
+  const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+  userScrolledUp = distanceFromBottom > 95;
+});
+
+function smartScrollToBottom(force = false) {
+  if (force || !userScrolledUp) {
+    viewport.scrollTop = viewport.scrollHeight;
+  }
+}
+
+function toggleDrawer() { document.getElementById('leftDrawer').classList.toggle('collapsed'); }
+
+function switchDrawerTab(tab) {
+  document.getElementById('tabBtnSessions').classList.toggle('active', tab === 'sessions');
+  document.getElementById('tabBtnConfig').classList.toggle('active', tab === 'config');
+  document.getElementById('paneSessions').classList.toggle('active', tab === 'sessions');
+  document.getElementById('paneConfig').classList.toggle('active', tab === 'config');
+}
+
+function toggleThinkingMode() {
+  thinkingEnabled = !thinkingEnabled;
+  const chip = document.getElementById('thinkingChip');
+  chip.classList.toggle('active', thinkingEnabled);
+  chip.innerText = thinkingEnabled ? 'Thinking: ON' : 'Thinking: OFF';
+}
+
+function toggleToolsPopover() { document.getElementById('toolsPopover').classList.toggle('open'); }
+
+function updateToolsCount() {
+  const checked = document.querySelectorAll('#toolsList input:checked').length;
+  const chip = document.getElementById('toolsChip');
+  chip.innerText = `Tools (${checked} Active)`;
+  chip.classList.toggle('active', checked > 0);
+}
+
+function buildGalleryHtml(images) {
+  if (!images || images.length === 0) return '';
+  const cards = images.map(img => `
+    <div class="img-card">
+      <a href="${escapeHtml(img.image)}" target="_blank" rel="noopener">
+        <img src="${escapeHtml(img.image)}"
+             referrerpolicy="no-referrer"
+             onerror="if(this.src !== '${escapeHtml(img.thumbnail)}') this.src='${escapeHtml(img.thumbnail)}';"
+             alt="${escapeHtml(img.title)}" />
+      </a>
+      <div class="img-caption" title="${escapeHtml(img.title)}">${escapeHtml(img.title)}</div>
+    </div>
+  `).join('');
+  return `<div class="image-gallery">${cards}</div>`;
+}
+
+function renderEmptyHero() {
+  const col = document.getElementById('chatColumn');
+  col.innerHTML = `
+    <div class="hero-empty">
+      <div class="hero-title">Aria Autonomous Agent</div>
+      <div class="hero-sub">Multi-tool chaining, live Thinking auto-collapse, FetchV media sniffing, and Workspace file automation.</div>
+      <div class="starter-grid">
+        <div class="starter-card" onclick="fillPrompt('Search for the top 3 features of Python 3.13, create a folder called python_notes in Workspace, and save a summary file inside it.')">
+          <div class="starter-card-title">Search + Create Folder + Save File</div>
+          <div class="starter-card-desc">Multi-tool chain from web search to Workspace file</div>
+        </div>
+        <div class="starter-card" onclick="fillPrompt('Show me an image of Raiden Shogun')">
+          <div class="starter-card-title">Show Visual Gallery</div>
+          <div class="starter-card-desc">Search and display high-res images right in chat</div>
+        </div>
+        <div class="starter-card" onclick="fillPrompt('Download these videos to my Workspace: ')">
+          <div class="starter-card-title">Universal Media Downloader</div>
+          <div class="starter-card-desc">Download Reels, YouTube, or custom HLS streams</div>
+        </div>
+        <div class="starter-card" onclick="fillPrompt('Hey Aria, what kind of trouble can we get into today?')">
+          <div class="starter-card-title">Chat with Aria</div>
+          <div class="starter-card-desc">Instant banter in her signature flirtatious persona</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function fillPrompt(txt) {
+  const inp = document.getElementById('promptInput');
+  inp.value = txt;
+  inp.focus();
+}
+
+async function initApp() {
+  const res = await fetch('/api/init');
+  const data = await res.json();
+  document.getElementById('modelPathInput').value = data.default_model;
+  document.getElementById('cwdInput').value = data.cwd;
+  document.getElementById('personaInput').value = data.persona;
+  document.getElementById('memIndicator').innerText = `RAM: ${data.active_mem_mb} MB`;
+
+  // Update model pill in header
+  try {
+    const modelParts = (data.default_model || '').split(/[\/\\]/).filter(Boolean);
+    const modelLabel = modelParts.length > 0 ? modelParts[modelParts.length - 1] : 'MLX Model';
+    const pill = document.querySelector('.model-pill');
+    if (pill) pill.innerText = `${modelLabel} • MLX`;
+  } catch (e) {}
+  const tl = document.getElementById('toolsList');
+  tl.innerHTML = data.tools.map(t => `
+    <label class="tool-check-row" title="${t.description}">
+      <input type="checkbox" value="${t.name}" ${t.default_enabled ? 'checked' : ''} onchange="updateToolsCount()">
+      <span>${t.name}</span>
+    </label>
+  `).join('');
+  updateToolsCount();
+  renderSessions(data.sessions);
+  if (data.sessions.length > 0) { loadSession(data.sessions[0].id); } else { renderEmptyHero(); }
+}
+
+function renderSessions(sessions) {
+  const container = document.getElementById('sessionList');
+  container.innerHTML = '';
+  sessions.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'session-item' + (s.id === currentSessionId ? ' active' : '');
+    row.onclick = () => loadSession(s.id);
+    row.innerHTML = `
+      <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(s.title)}</span>
+      <span class="session-del" onclick="deleteSession(event, '${s.id}')">DEL</span>
+    `;
+    container.appendChild(row);
+  });
+}
+
+async function createNewSession() {
+  const res = await fetch('/api/session/new', { method: 'POST' });
+  const s = await res.json();
+  currentSessionId = s.id;
+  const initRes = await fetch('/api/init');
+  const initData = await initRes.json();
+  renderSessions(initData.sessions);
+  renderEmptyHero();
+}
+
+async function deleteSession(e, sid) {
+  e.stopPropagation();
+  const res = await fetch(`/api/session/${sid}`, { method: 'DELETE' });
+  const data = await res.json();
+  renderSessions(data.sessions);
+  if (sid === currentSessionId && data.sessions.length > 0) { loadSession(data.sessions[0].id); }
+}
+
+async function loadSession(sid) {
+  currentSessionId = sid;
+  const res = await fetch(`/api/session/${sid}`);
+  const data = await res.json();
+  const col = document.getElementById('chatColumn');
+  col.innerHTML = '';
+  if (!data.messages || data.messages.length === 0) {
+    renderEmptyHero();
+  } else {
+    data.messages.forEach(m => {
+      if (m.role === 'user') { appendUserMessage(m.content); } else { appendSavedAssistantMessage(m); }
+    });
+  }
+  const initRes = await fetch('/api/init');
+  const initData = await initRes.json();
+  renderSessions(initData.sessions);
+  smartScrollToBottom(true);
+}
+
+function appendUserMessage(text) {
+  const col = document.getElementById('chatColumn');
+  const hero = col.querySelector('.hero-empty');
+  if (hero) hero.remove();
+  const div = document.createElement('div');
+  div.className = 'turn-block';
+  div.innerHTML = `<div class="user-bubble">${escapeHtml(text)}</div>`;
+  col.appendChild(div);
+}
+
+function appendSavedAssistantMessage(m) {
+  const col = document.getElementById('chatColumn');
+  const wrap = document.createElement('div');
+  wrap.className = 'turn-block';
+
+  let logsHtml = '';
+  if (m.logs && m.logs.length > 0) {
+    const rows = m.logs.map(l => `<div class="log-line"><span class="log-ts">[${l.ts}]</span><span class="log-tag">[${l.tag}]</span>${escapeHtml(l.msg)}</div>`).join('');
+    logsHtml = `<div class="pill-drawer"><div class="pill-header" onclick="this.parentElement.classList.toggle('open')"><span>Telemetry (${m.logs.length} events)</span><span>Inspect</span></div><div class="pill-body">${rows}</div></div>`;
+  }
+
+  let stepsHtml = '';
+  if (m.steps && m.steps.length > 0) {
+    stepsHtml = m.steps.map(s => `<div class="pill-drawer"><div class="pill-header" onclick="this.parentElement.classList.toggle('open')"><span>${escapeHtml(s.label)}</span><span>Output</span></div><div class="pill-body">${escapeHtml(s.output)}</div></div>`).join('');
+  }
+
+  const hasThink = Boolean(m.think && m.think.trim());
+  const thinkBtnHtml = hasThink
+    ? `<button class="think-toggle-btn" onclick="const b=this.parentElement.parentElement.querySelector('.think-box'); b.classList.toggle('open');">Thinking</button>`
+    : '';
+  const thinkBoxHtml = hasThink
+    ? `<div class="think-box">${escapeHtml(m.think)}</div>`
+    : '';
+
+  const galleryHtml = buildGalleryHtml(m.images);
+
+  wrap.innerHTML = `
+    <div class="assistant-header">
+      <span class="assistant-name">Aria</span>
+      ${thinkBtnHtml}
+    </div>
+    ${thinkBoxHtml}
+    ${logsHtml}
+    ${stepsHtml}
+    ${galleryHtml}
+    <div class="markdown-body">${marked.parse(m.content || '')}</div>
+  `;
+  col.appendChild(wrap);
+}
+
+function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendPrompt(); } }
+
+async function sendPrompt() {
+  document.getElementById('toolsPopover').classList.remove('open');
+  const input = document.getElementById('promptInput');
+  const prompt = input.value.trim();
+  if (!prompt) return;
+  input.value = '';
+  userScrolledUp = false;
+
+  const activeTools = Array.from(document.querySelectorAll('#toolsList input:checked')).map(c => c.value);
+  appendUserMessage(prompt);
+  const col = document.getElementById('chatColumn');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'turn-block';
+  wrap.innerHTML = `
+    <div class="assistant-header">
+      <span class="assistant-name">Aria</span>
+      <button class="think-toggle-btn" id="liveThinkBtn" style="display:none" onclick=" toggleLiveThink(this)">Thinking</button>
+    </div>
+    <div class="think-box" id="liveThinkBox"></div>
+    <div class="pill-drawer open" id="liveLogDrawer">
+      <div class="pill-header" onclick="this.parentElement.classList.toggle('open')"><span>Live Execution Telemetry</span><span>Toggle</span></div>
+      <div class="pill-body" id="liveLogs"></div>
+    </div>
+    <div id="liveSteps"></div>
+    <div id="liveImages"></div>
+    <div class="markdown-body" id="liveStream"></div>
+  `;
+  col.appendChild(wrap);
+  smartScrollToBottom(true);
+
+  const liveThinkBtn = wrap.querySelector('#liveThinkBtn');
+  const liveThinkBox = wrap.querySelector('#liveThinkBox');
+  const liveLogs = wrap.querySelector('#liveLogs');
+  const liveSteps = wrap.querySelector('#liveSteps');
+  const liveImages = wrap.querySelector('#liveImages');
+  const liveStream = wrap.querySelector('#liveStream');
+  const liveLogDrawer = wrap.querySelector('#liveLogDrawer');
+
+  let userManuallyToggledThink = false;
+  let autoCollapsedOnce = false;
+
+  window.toggleLiveThink = function(btn) {
+    userManuallyToggledThink = true;
+    liveThinkBox.classList.toggle('open');
+  };
+
+  document.getElementById('sendBtn').style.display = 'none';
+  document.getElementById('stopBtn').style.display = 'inline-block';
+  abortController = new AbortController();
+
+  const payload = {
+    session_id: currentSessionId,
+    prompt: prompt,
+    persona: document.getElementById('personaInput').value,
+    model_path: document.getElementById('modelPathInput').value,
+    cwd: document.getElementById('cwdInput').value,
+    enable_thinking: thinkingEnabled,
+    action_token_limit: parseInt(document.getElementById('actSlider').value),
+    final_token_limit: parseInt(document.getElementById('finSlider').value),
+    obs_limit: parseInt(document.getElementById('obsSlider').value),
+    max_steps: parseInt(document.getElementById('stepsSlider').value),
+    temperature: parseFloat(document.getElementById('tempSlider').value),
+    tools: activeTools
+  };
+
+  try {
+    const response = await fetch('/api/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: abortController.signal
+    });
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+
+      for (const part of parts) {
+        if (!part.startsWith('data: ')) continue;
+        const ev = JSON.parse(part.slice(6));
+
+        if (ev.type === 'log') {
+          const row = document.createElement('div');
+          row.className = 'log-line';
+          row.innerHTML = `<span class="log-ts">[${ev.ts}]</span><span class="log-tag">[${ev.tag}]</span>${escapeHtml(ev.msg)}`;
+          liveLogs.appendChild(row);
+          liveLogs.scrollTop = liveLogs.scrollHeight;
+        } else if (ev.type === 'token') {
+          // 1. Handle Thinking Stream & Auto-Collapse
+          if (ev.think) {
+            liveThinkBtn.style.display = 'inline-flex';
+            liveThinkBox.textContent = ev.think;
+
+            if (ev.is_thinking) {
+              liveThinkBtn.classList.add('streaming');
+              liveThinkBtn.innerText = 'Thinking...';
+              if (!userManuallyToggledThink) {
+                liveThinkBox.classList.add('open');
+                liveThinkBox.scrollTop = liveThinkBox.scrollHeight;
+              }
+            } else {
+              liveThinkBtn.classList.remove('streaming');
+              liveThinkBtn.innerText = 'Thinking';
+              // As soon as she finishes thinking and starts writing the answer, auto-hide the box!
+              if (!autoCollapsedOnce && !userManuallyToggledThink && ev.text && ev.text.length > 0) {
+                liveThinkBox.classList.remove('open');
+                autoCollapsedOnce = true;
+              }
+            }
+          }
+
+          // 2. Render Answer Stream
+          if (ev.text) {
+            liveStream.innerHTML = marked.parse(ev.text);
+          }
+          document.getElementById('tpsIndicator').innerText = `${ev.tps} tok/s`;
+          smartScrollToBottom();
+        } else if (ev.type === 'images') {
+          liveImages.insertAdjacentHTML('beforeend', buildGalleryHtml(ev.images));
+          smartScrollToBottom();
+        } else if (ev.type === 'clear_stream') {
+          liveStream.innerHTML = '';
+          autoCollapsedOnce = false;
+        } else if (ev.type === 'step') {
+          const card = document.createElement('div');
+          card.className = 'pill-drawer';
+          card.innerHTML = `<div class="pill-header" onclick="this.parentElement.classList.toggle('open')"><span>${escapeHtml(ev.label)}</span><span>Output</span></div><div class="pill-body">${escapeHtml(ev.output)}</div>`;
+          liveSteps.appendChild(card);
+          smartScrollToBottom();
+        } else if (ev.type === 'error') {
+          liveStream.innerHTML = `<div style="color:#f85149; font-family:var(--font-mono)">Error: ${escapeHtml(ev.message)}</div>`;
+       } else if (ev.type === 'done') {
+          const finalContent = (ev.content && ev.content.trim()) ? ev.content : '';
+          if (ev.think && ev.think.trim()) {
+            liveThinkBtn.style.display = 'inline-flex';
+            liveThinkBtn.classList.remove('streaming');
+            liveThinkBtn.innerText = 'Thinking';
+            liveThinkBox.textContent = ev.think;
+            if (!userManuallyToggledThink) {
+              liveThinkBox.classList.remove('open');
+            }
+          } else {
+            liveThinkBtn.style.display = 'none';
+            liveThinkBox.classList.remove('open');
+          }
+          liveLogDrawer.classList.remove('open');
+          liveStream.innerHTML = marked.parse(finalContent);
+          document.getElementById('memIndicator').innerText = `RAM: ${ev.active_mem_mb} MB`;
+          renderSessions(ev.sessions);
+          smartScrollToBottom();
+        }
+      }
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      const row = document.createElement('div');
+      row.className = 'log-line';
+      row.innerHTML = `<span class="log-tag">[STOPPED]</span>Generation halted by user.`;
+      liveLogs.appendChild(row);
+    }
+  } finally {
+    document.getElementById('sendBtn').style.display = 'inline-block';
+    document.getElementById('stopBtn').style.display = 'none';
+    abortController = null;
+  }
+}
+
+async function stopGeneration() {
+  fetch('/api/stop', { method: 'POST' });
+  if (abortController) { abortController.abort(); }
+}
+
+function escapeHtml(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+// Configure marked.js so every link opens in a new tab and missing https:// is auto-repaired
+const renderer = new marked.Renderer();
+renderer.link = function(href, title, text) {
+  let cleanHref = (typeof href === 'object' && href !== null) ? (href.href || '') : String(href || '');
+  let cleanText = (typeof href === 'object' && href !== null) ? (href.text || '') : String(text || cleanHref);
+  if (cleanHref && !cleanHref.startsWith('http://') && !cleanHref.startsWith('https://') && !cleanHref.startsWith('/')) {
+    cleanHref = 'https://' + cleanHref;
+  }
+  return `<a href="${escapeHtml(cleanHref)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent); text-decoration:underline; font-weight:600">${cleanText}</a>`;
+};
+marked.setOptions({ renderer: renderer });
+
+initApp();
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# Aria // Venice Agent Workspace Dependencies
+# Recommended Python version: 3.10 - 3.13 (macOS Apple Silicon)
+
+# Core Web Framework
+Flask>=3.0.0,<4.0.0
+
+# Apple Silicon MLX Acceleration
+mlx>=0.20.0; sys_platform == 'darwin'
+mlx-lm>=0.20.0; sys_platform == 'darwin'
+mlx-metal>=0.20.0; sys_platform == 'darwin'
+
+# Model & Tokenizer Support
+transformers>=4.40.0
+huggingface_hub>=0.23.0
+numpy>=1.26.0
+
+# Agent Tools
+ddgs>=9.10.0              # Fast live internet & image search
+trafilatura>=2.0.0        # Webpage text & article scraping
+yt-dlp>=2024.0.0          # Universal audio & video downloader
+playwright>=1.40.0        # Headless Chromium network stream sniffer
+
+# Environment Configuration
+python-dotenv>=1.0.0
+

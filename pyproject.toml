@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aria-venice-agent"
+version = "1.0.0"
+description = "Autonomous local AI agent workspace powered by Apple Silicon MLX and Venice Dark UI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Violet Project" }
+]
+keywords = [
+    "agent",
+    "mlx",
+    "apple-silicon",
+    "metal",
+    "autonomous-agent",
+    "flask",
+    "local-ai",
+    "venice-ui"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: MacOS :: MacOS X",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "Flask>=3.0.0,<4.0.0",
+    "transformers>=4.40.0",
+    "huggingface_hub>=0.23.0",
+    "numpy>=1.26.0",
+    "ddgs>=9.10.0",
+    "trafilatura>=2.0.0",
+    "yt-dlp>=2024.0.0",
+    "playwright>=1.40.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+mlx = [
+    "mlx>=0.20.0; sys_platform == 'darwin'",
+    "mlx-lm>=0.20.0; sys_platform == 'darwin'",
+    "mlx-metal>=0.20.0; sys_platform == 'darwin'",
+]
+
+[tool.setuptools]
+packages = ["tools"]
+py-modules = ["app", "config", "database", "engine"]
+

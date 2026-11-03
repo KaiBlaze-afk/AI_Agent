@@ -1,0 +1,88 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Environment variables & local secrets
+.env
+.env.local
+.env.*.local
+
+# SQLite database & journals
+agent_sessions.db
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs and Text Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Model weights & offline model directories (often multi-gigabytes)
+model/
+*MLX*/
+*.safetensors
+*.bin
+*.gguf
+*.pt
+*.pth
+
+# Agent Workspace output (ignore files generated during runtime, keep folder structure)
+Workspace/*
+!Workspace/.gitkeep
+
+# Playwright & browser automation traces/logs
+.playwright/
+playwright-report/
+test-results/
+
+# Log files
+*.log
+
